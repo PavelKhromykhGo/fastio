@@ -12,10 +12,6 @@ type FastReader struct {
 	buf []byte
 	pos int
 	n   int
-
-	lastByte byte
-	hasLast  bool
-
 	err error
 }
 
@@ -46,39 +42,57 @@ func (fr *FastReader) fill() {
 }
 
 func (fr *FastReader) ReadByte() (byte, error) {
+	if err := fr.ensureData(); err != nil {
+		return 0, err
+	}
+
+	b := fr.buf[fr.pos]
+	fr.pos++
+
+	if fr.pos >= fr.n {
+		// Try to read ahead to determine the correct terminal error state.
+		if fr.err == nil {
+			fr.fill()
+		}
+		if fr.n == 0 {
+			if fr.err == nil {
+				fr.err = io.EOF
+			}
+			return b, fr.err
+		}
+	}
+
+	if fr.pos >= fr.n && fr.err != nil {
+		return b, fr.err
+	}
+
+	return b, nil
+}
+
+func (fr *FastReader) PeekByte() (byte, error) {
+	if err := fr.ensureData(); err != nil {
+		return 0, err
+	}
+
+	return fr.buf[fr.pos], nil
+}
+
+func (fr *FastReader) ensureData() error {
 	if fr.err != nil && !(fr.err == io.EOF && fr.pos < fr.n) {
-		return 0, fr.err
+		return fr.err
 	}
-	if fr.hasLast {
-		fr.hasLast = false
-		return fr.lastByte, nil
-	}
+
 	if fr.pos >= fr.n {
 		fr.fill()
 		if fr.n == 0 {
 			if fr.err == nil {
 				fr.err = io.EOF
 			}
-			return 0, fr.err
+			return fr.err
 		}
 	}
 
-	b := fr.buf[fr.pos]
-	fr.pos++
-	return b, nil
-}
-
-func (fr *FastReader) PeekByte() (byte, error) {
-	if fr.hasLast {
-		return fr.lastByte, nil
-	}
-	b, err := fr.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	fr.lastByte = b
-	fr.hasLast = true
-	return b, nil
+	return nil
 }
 
 func (fr *FastReader) SkipSpaces() error {

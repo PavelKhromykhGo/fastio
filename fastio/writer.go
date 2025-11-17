@@ -19,6 +19,25 @@ type FastWriter struct {
 	scratch []byte
 }
 
+type writerError struct {
+	err error
+}
+
+func (we writerError) Error() string {
+	return we.err.Error()
+}
+
+func (we writerError) Unwrap() error {
+	return we.err
+}
+
+func (we writerError) Is(target error) bool {
+	if target == nil {
+		return we.err == nil
+	}
+	return we.err.Error() == target.Error()
+}
+
 func NewWriter(w io.Writer) *FastWriter {
 	return &FastWriter{
 		w:         w,
@@ -56,11 +75,11 @@ func (fw *FastWriter) Flush() error {
 	}
 	n, err := fw.w.Write(fw.buf[:fw.pos])
 	if err != nil {
-		fw.err = err
+		fw.err = writerError{err: err}
 		return err
 	}
 	if n < fw.pos {
-		fw.err = io.ErrShortWrite
+		fw.err = writerError{err: io.ErrShortWrite}
 		return fw.err
 	}
 	fw.pos = 0
@@ -71,13 +90,18 @@ func (fw *FastWriter) ensureSpace(n int) error {
 	if fw.err != nil {
 		return fw.err
 	}
+	if fw.pos == 0 {
+		if err := fw.checkWriter(); err != nil {
+			return err
+		}
+	}
 	if n > len(fw.buf) {
 		if err := fw.Flush(); err != nil {
 			return err
 		}
 		_, err := fw.w.Write(fw.buf[:0])
 		if err != nil {
-			fw.err = err
+			fw.err = writerError{err: err}
 		}
 		return err
 	}
@@ -85,6 +109,17 @@ func (fw *FastWriter) ensureSpace(n int) error {
 		if err := fw.Flush(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (fw *FastWriter) checkWriter() error {
+	if fw.err != nil {
+		return fw.err
+	}
+	if _, err := fw.w.Write(nil); err != nil {
+		fw.err = writerError{err: err}
+		return fw.err
 	}
 	return nil
 }
