@@ -1,1 +1,199 @@
 package fastio
+
+import (
+	"errors"
+	"io"
+)
+
+const defaultReaderBufSize = 64 * 1024 // 64KB
+
+type FastReader struct {
+	r   io.Reader
+	buf []byte
+	pos int
+	n   int
+
+	lastByte byte
+	hasLast  bool
+
+	err error
+}
+
+func NewReader(r io.Reader) *FastReader {
+	return &FastReader{
+		r:   r,
+		buf: make([]byte, defaultReaderBufSize),
+	}
+}
+
+func (fr *FastReader) Err() error {
+	return fr.err
+}
+
+func (fr *FastReader) fill() {
+	if fr.err != nil {
+		return
+	}
+	n, err := fr.r.Read(fr.buf)
+	if n < 0 {
+		n = 0
+	}
+	fr.n = n
+	fr.pos = 0
+	if err != nil {
+		fr.err = err
+	}
+}
+
+func (fr *FastReader) ReadByte() (byte, error) {
+	if fr.err != nil && !(fr.err == io.EOF && fr.pos < fr.n) {
+		return 0, fr.err
+	}
+	if fr.hasLast {
+		fr.hasLast = false
+		return fr.lastByte, nil
+	}
+	if fr.pos >= fr.n {
+		fr.fill()
+		if fr.n == 0 {
+			if fr.err == nil {
+				fr.err = io.EOF
+			}
+			return 0, fr.err
+		}
+	}
+
+	b := fr.buf[fr.pos]
+	fr.pos++
+	return b, nil
+}
+
+func (fr *FastReader) PeekByte() (byte, error) {
+	if fr.hasLast {
+		return fr.lastByte, nil
+	}
+	b, err := fr.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	fr.lastByte = b
+	fr.hasLast = true
+	return b, nil
+}
+
+func (fr *FastReader) SkipSpaces() error {
+	for {
+		b, err := fr.PeekByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		if b == ' ' || b == '\n' || b == '\r' || b == '\t' {
+			_, _ = fr.ReadByte()
+			continue
+		}
+		return nil
+	}
+}
+
+func (fr *FastReader) NextWord() (string, error) {
+	if err := fr.SkipSpaces(); err != nil {
+		if errors.Is(err, io.EOF) {
+			return "", io.EOF
+		}
+		return "", err
+	}
+
+	var buf []byte
+	for {
+		b, err := fr.PeekByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if len(buf) == 0 {
+					return "", io.EOF
+				}
+				return string(buf), nil
+			}
+			return "", err
+		}
+		if b == ' ' || b == '\n' || b == '\r' || b == '\t' {
+			break
+		}
+		_, _ = fr.ReadByte()
+		buf = append(buf, b)
+	}
+	if len(buf) == 0 {
+		return "", io.EOF
+	}
+	return string(buf), nil
+}
+
+func (fr *FastReader) NextInt() (int, error) {
+	if err := fr.SkipSpaces(); err != nil {
+		return 0, err
+	}
+
+	sign := 1
+	b, err := fr.PeekByte()
+	if err != nil {
+		return 0, err
+	}
+	if b == '-' {
+		sign = -1
+		_, _ = fr.ReadByte()
+	} else if b == '+' {
+		_, _ = fr.ReadByte()
+	}
+
+	var val int
+	digitsRead := 0
+
+	for {
+		b, err = fr.PeekByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return 0, err
+		}
+		if b < '0' || b > '9' {
+			break
+		}
+		_, _ = fr.ReadByte()
+		val = val*10 + int(b-'0')
+		digitsRead++
+	}
+
+	if digitsRead == 0 {
+		return 0, errors.New("fastio: NextInt: no digits found")
+	}
+	return sign * val, nil
+}
+
+func (fr *FastReader) NextLine() (string, error) {
+	var buf []byte
+
+	for {
+		b, err := fr.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if len(buf) == 0 {
+					return "", io.EOF
+				}
+				break
+			}
+			return "", err
+		}
+		if b == '\n' {
+			break
+		}
+		buf = append(buf, b)
+	}
+	if len(buf) > 0 && buf[len(buf)-1] == '\r' {
+		buf = buf[:len(buf)-1]
+	}
+
+	return string(buf), nil
+}
