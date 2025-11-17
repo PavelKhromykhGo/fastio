@@ -1,1 +1,1 @@
-package fastio
+package fastio_test
