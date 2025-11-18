@@ -188,3 +188,8 @@ func (fw *FastWriter) WriteFloat64(v float64, prec int) error {
 	fw.scratch = strconv.AppendFloat(fw.scratch[:0], v, 'f', prec, 64)
 	return fw.WriteBytes(fw.scratch)
 }
+
+func (fw *FastWriter) WriteInt64(v int64) error {
+	fw.scratch = strconv.AppendInt(fw.scratch[:0], v, 10)
+	return fw.WriteBytes(fw.scratch)
+}
