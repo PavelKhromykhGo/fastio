@@ -144,3 +144,28 @@ func TestFlushEmptyDoesNotWrite(t *testing.T) {
 		t.Errorf("Expected Flush on empty buffer to not call underlying Write")
 	}
 }
+
+func TestWriteInt64(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
+
+	if err := w.WriteInt64(-9223372036854775808); err != nil {
+		t.Fatalf("WriteInt64 #1 error: %v", err)
+	}
+	if err := w.WriteByte(' '); err != nil {
+		t.Fatalf("WriteByte error: %v", err)
+	}
+	if err := w.WriteInt64(9223372036854775807); err != nil {
+		t.Fatalf("WriteInt64 #2 error: %v", err)
+	}
+
+	if err := w.Flush(); err != nil {
+		t.Fatalf("Flush error: %v", err)
+	}
+
+	got := buf.String()
+	want := "-9223372036854775808 9223372036854775807"
+	if got != want {
+		t.Fatalf("unexpected output.\nwant: %q\ngot:  %q", want, got)
+	}
+}
