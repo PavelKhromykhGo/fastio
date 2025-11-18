@@ -1,3 +1,7 @@
+// Package fastio предоставляет быстрые функции ввода/вывода,
+// основанные на буферизации и низкоуровневом парсинге.
+// FastReader и FastWriter ускоряют работу со stdin/stdout и файлами
+// по сравнению со стандартными fmt.Fscan / fmt.Fprint.
 package fastio
 
 import (
@@ -8,6 +12,16 @@ import (
 
 const defaultReaderBufSize = 64 * 1024 // 64KB
 
+// FastReader — быстрый буферизованный ридер.
+//
+// Он обеспечивает:
+//   - минимальное количество аллокаций;
+//   - методы для чтения примитивов: NextInt, NextInt64, NextUint64,
+//     NextFloat64, NextWord, NextLine;
+//   - совместимость с любым io.Reader (stdin, файл, сокет);
+//   - ручное управление ошибками через Err().
+//
+// FastReader не является потокобезопасным.
 type FastReader struct {
 	r   io.Reader
 	buf []byte
@@ -16,6 +30,10 @@ type FastReader struct {
 	err error
 }
 
+// NewReader создает FastReader поверх существующего io.Reader.
+// Буфер создаётся размером 64 KB.
+//
+// Используется для быстрого чтения из stdin, файла или сетевого потока.
 func NewReader(r io.Reader) *FastReader {
 	return &FastReader{
 		r:   r,
@@ -23,6 +41,8 @@ func NewReader(r io.Reader) *FastReader {
 	}
 }
 
+// Err возвращает первую возникшую ошибку (включая io.EOF).
+// Если ошибка уже произошла, дальнейшее чтение недоступно.
 func (fr *FastReader) Err() error {
 	return fr.err
 }
@@ -42,6 +62,10 @@ func (fr *FastReader) fill() {
 	}
 }
 
+// ReadByte читает один байт из внутреннего буфера.
+// При необходимости буфер автоматически заполняется.
+//
+// В случае достижения конца файла возвращает io.EOF.
 func (fr *FastReader) ReadByte() (byte, error) {
 	if err := fr.ensureData(); err != nil {
 		return 0, err
@@ -70,6 +94,10 @@ func (fr *FastReader) ReadByte() (byte, error) {
 	return b, nil
 }
 
+// PeekByte возвращает следующий байт, не продвигая позицию в буфере.
+// Полезно для lookahead-парсинга.
+//
+// В случае EOF возвращается ошибка io.EOF.
 func (fr *FastReader) PeekByte() (byte, error) {
 	if err := fr.ensureData(); err != nil {
 		return 0, err
@@ -96,6 +124,10 @@ func (fr *FastReader) ensureData() error {
 	return nil
 }
 
+// SkipSpaces пропускает пробельные символы: пробелы, \n, \r, \t.
+// Используется перед парсингом чисел и слов.
+//
+// Если пробелы находятся в конце файла — возвращает io.EOF.
 func (fr *FastReader) SkipSpaces() error {
 	for {
 		b, err := fr.PeekByte()
@@ -113,6 +145,10 @@ func (fr *FastReader) SkipSpaces() error {
 	}
 }
 
+// NextWord читает последовательность непробельных символов.
+// Используется для токенизации входа.
+//
+// В случае отсутствия данных возвращает io.EOF.
 func (fr *FastReader) NextWord() (string, error) {
 	if err := fr.SkipSpaces(); err != nil {
 		if errors.Is(err, io.EOF) {
@@ -145,6 +181,10 @@ func (fr *FastReader) NextWord() (string, error) {
 	return string(buf), nil
 }
 
+// NextInt читает целое число типа int (со знаком).
+// Формат поддерживает ведущие пробелы, знак '+' или '-'.
+//
+// В случае отсутствия цифр возвращает ошибку.
 func (fr *FastReader) NextInt() (int, error) {
 	if err := fr.SkipSpaces(); err != nil {
 		return 0, err
@@ -187,6 +227,8 @@ func (fr *FastReader) NextInt() (int, error) {
 	return sign * val, nil
 }
 
+// NextInt64 читает 64-битное целое число со знаком.
+// Работает аналогично NextInt, но возвращает int64.
 func (fr *FastReader) NextInt64() (int64, error) {
 	if err := fr.SkipSpaces(); err != nil {
 		return 0, err
@@ -228,6 +270,10 @@ func (fr *FastReader) NextInt64() (int64, error) {
 	return sign * val, nil
 }
 
+// NextUint64 читает беззнаковое целое число.
+// Допускается ведущий '+' перед числом.
+//
+// В случае отсутствия цифр возвращает ошибку.
 func (fr *FastReader) NextUint64() (uint64, error) {
 	if err := fr.SkipSpaces(); err != nil {
 		return 0, err
@@ -266,6 +312,9 @@ func (fr *FastReader) NextUint64() (uint64, error) {
 	return val, nil
 }
 
+// NextFloat64 читает число в формате float64.
+// Поддерживает: целые, дробные, экспоненциальные ("1e9") форматы.
+// Реализовано через NextWord + strconv.ParseFloat.
 func (fr *FastReader) NextFloat64() (float64, error) {
 	token, err := fr.NextWord()
 	if err != nil {
@@ -278,6 +327,11 @@ func (fr *FastReader) NextFloat64() (float64, error) {
 	return v, nil
 }
 
+// NextLine читает строку до символа '\n'.
+// Символ переноса строки не включается в результат.
+// CRLF ("\r\n") приводится к обычному LF.
+//
+// В случае пустого оставшегося ввода возвращает io.EOF.
 func (fr *FastReader) NextLine() (string, error) {
 	var buf []byte
 

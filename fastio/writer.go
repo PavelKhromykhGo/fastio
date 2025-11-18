@@ -1,3 +1,17 @@
+// Package fastio предоставляет быстрые функции ввода/вывода,
+// основанные на буферизации и низкоуровневом парсинге.
+// FastWriter — быстрый буферизованный writer,
+// реализующий методы для эффективной записи строк,
+// чисел и байтов без лишних аллокаций.
+//
+// Особенности:
+//   - совместимость с io.Writer;
+//   - автоматическая буферизация;
+//   - ручной Flush();
+//   - опциональный AutoFlush при достижении лимита;
+//   - минимальное количество выделений памяти.
+//
+// FastWriter не является потокобезопасным.
 package fastio
 
 import (
@@ -38,6 +52,10 @@ func (we writerError) Is(target error) bool {
 	return we.err.Error() == target.Error()
 }
 
+// NewWriter создаёт FastWriter поверх io.Writer.
+// Буфер создаётся размером 64 KB.
+//
+// Важно: не забывайте вызывать Flush() перед завершением работы.
 func NewWriter(w io.Writer) *FastWriter {
 	return &FastWriter{
 		w:         w,
@@ -48,6 +66,9 @@ func NewWriter(w io.Writer) *FastWriter {
 	}
 }
 
+// NewWriterWithAutoFlush включает автоматический сброс буфера,
+// когда размер данных достигает limit байт.
+// limit рекомендуется устанавливать ≤ размера внутреннего буфера.
 func NewWriterWithAutoFlush(w io.Writer, limit int) *FastWriter {
 	if limit <= 0 || limit > defaultWriterBufSize {
 		limit = defaultWriterBufSize / 2
@@ -62,10 +83,14 @@ func NewWriterWithAutoFlush(w io.Writer, limit int) *FastWriter {
 
 }
 
+// Err возвращает первую возникшую ошибку записи.
+// После её появления дальнейшие операции записи прекращаются.
 func (fw *FastWriter) Err() error {
 	return fw.err
 }
 
+// Flush сбрасывает внутренний буфер в базовый io.Writer.
+// Если базовый writer возвращает ошибку — она хранится в Err().
 func (fw *FastWriter) Flush() error {
 	if fw.err != nil {
 		return fw.err
@@ -124,6 +149,8 @@ func (fw *FastWriter) checkWriter() error {
 	return nil
 }
 
+// Write реализует интерфейс io.Writer.
+// Записывает данные в буфер с последующим Flush при необходимости.
 func (fw *FastWriter) Write(p []byte) (int, error) {
 	if fw.err != nil {
 		return 0, fw.err
@@ -146,6 +173,7 @@ func (fw *FastWriter) Write(p []byte) (int, error) {
 	return total, nil
 }
 
+// WriteByte записывает один байт.
 func (fw *FastWriter) WriteByte(b byte) error {
 	if err := fw.ensureSpace(1); err != nil {
 		return err
@@ -158,15 +186,18 @@ func (fw *FastWriter) WriteByte(b byte) error {
 	return nil
 }
 
+// WriteBytes записывает массив байт, аналогичен Write(p).
 func (fw *FastWriter) WriteBytes(b []byte) error {
 	_, err := fw.Write(b)
 	return err
 }
 
+// WriteString записывает строку без дополнительных символов.
 func (fw *FastWriter) WriteString(s string) error {
 	return fw.WriteBytes([]byte(s))
 }
 
+// WriteLine записывает строку и добавляет символ '\n'.
 func (fw *FastWriter) WriteLine(s string) error {
 	if err := fw.WriteString(s); err != nil {
 		return err
@@ -174,21 +205,26 @@ func (fw *FastWriter) WriteLine(s string) error {
 	return fw.WriteByte('\n')
 }
 
+// WriteInt записывает int в десятичном формате без аллокаций.
 func (fw *FastWriter) WriteInt(v int) error {
 	fw.scratch = strconv.AppendInt(fw.scratch[:0], int64(v), 10)
 	return fw.WriteBytes(fw.scratch)
 }
 
+// WriteUint64 записывает uint64 в десятичном формате.
 func (fw *FastWriter) WriteUint64(v uint64) error {
 	fw.scratch = strconv.AppendUint(fw.scratch[:0], v, 10)
 	return fw.WriteBytes(fw.scratch)
 }
 
+// WriteFloat64 записывает float64 в указанной точности (prec).
+// Использует strconv.AppendFloat поверх scratch-буфера.
 func (fw *FastWriter) WriteFloat64(v float64, prec int) error {
 	fw.scratch = strconv.AppendFloat(fw.scratch[:0], v, 'f', prec, 64)
 	return fw.WriteBytes(fw.scratch)
 }
 
+// WriteInt64 записывает int64 в десятичном формате.
 func (fw *FastWriter) WriteInt64(v int64) error {
 	fw.scratch = strconv.AppendInt(fw.scratch[:0], v, 10)
 	return fw.WriteBytes(fw.scratch)
