@@ -178,3 +178,69 @@ func TestSkipSpaceAtEOF(t *testing.T) {
 		t.Fatalf("Expected EOF or nil error after skipping spaces, got: %v", err)
 	}
 }
+
+func TestNextInt64(t *testing.T) {
+	r := newTestReader("-9223372036854775808  9223372036854775807")
+	v1, err := r.NextInt64()
+	if err != nil {
+		t.Fatalf("NextInt64 #1 error: %v", err)
+	}
+	if v1 != -9223372036854775808 {
+		t.Fatalf("NextInt64 #1 expected %d, got %d", int64(-9223372036854775808), v1)
+	}
+
+	v2, err := r.NextInt64()
+	if err != nil {
+		t.Fatalf("NextInt64 #2 error: %v", err)
+	}
+	if v2 != 9223372036854775807 {
+		t.Fatalf("NextInt64 #2 expected %d, got %d", int64(9223372036854775807), v2)
+	}
+}
+
+func TestNextUint64(t *testing.T) {
+	r := newTestReader("  0  18446744073709551615")
+	v1, err := r.NextUint64()
+	if err != nil {
+		t.Fatalf("NextUint64 #1 error: %v", err)
+	}
+	if v1 != 0 {
+		t.Fatalf("NextUint64 #1 expected 0, got %d", v1)
+	}
+
+	v2, err := r.NextUint64()
+	if err != nil {
+		t.Fatalf("NextUint64 #2 error: %v", err)
+	}
+	if v2 != 18446744073709551615 {
+		t.Fatalf("NextUint64 #2 expected %d, got %d", uint64(18446744073709551615), v2)
+	}
+}
+
+func TestNextFloat64(t *testing.T) {
+	r := newTestReader("3.14 -0.5 1e3")
+
+	v1, err := r.NextFloat64()
+	if err != nil {
+		t.Fatalf("NextFloat64 #1 error: %v", err)
+	}
+	if v1 != 3.14 {
+		t.Fatalf("NextFloat64 #1 expected 3.14, got %v", v1)
+	}
+
+	v2, err := r.NextFloat64()
+	if err != nil {
+		t.Fatalf("NextFloat64 #2 error: %v", err)
+	}
+	if v2 != -0.5 {
+		t.Fatalf("NextFloat64 #2 expected -0.5, got %v", v2)
+	}
+
+	v3, err := r.NextFloat64()
+	if err != nil {
+		t.Fatalf("NextFloat64 #3 error: %v", err)
+	}
+	if v3 != 1000 {
+		t.Fatalf("NextFloat64 #3 expected 1000, got %v", v3)
+	}
+}
