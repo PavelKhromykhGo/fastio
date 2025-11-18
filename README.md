@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="fastio-logo.svg" alt="fastio — fast buffered I/O for Go" width="420" />
+</p>
+
+<p align="center">
+  <strong>fast buffered I/O for Go</strong>
+</p>
 # FastIO
 
 Библиотека быстрых ввода/вывода на Go с упором на работу со стандартными потоками и файлами. Пакет `fastio` предоставляет два основных типа:
