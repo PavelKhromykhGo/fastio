@@ -3,6 +3,7 @@ package fastio
 import (
 	"errors"
 	"io"
+	"strconv"
 )
 
 const defaultReaderBufSize = 64 * 1024 // 64KB
@@ -184,6 +185,97 @@ func (fr *FastReader) NextInt() (int, error) {
 		return 0, errors.New("fastio: NextInt: no digits found")
 	}
 	return sign * val, nil
+}
+
+func (fr *FastReader) NextInt64() (int64, error) {
+	if err := fr.SkipSpaces(); err != nil {
+		return 0, err
+	}
+
+	sign := int64(1)
+	b, err := fr.PeekByte()
+	if err != nil {
+		return 0, err
+	}
+	if b == '-' {
+		sign = -1
+		_, _ = fr.ReadByte()
+	} else if b == '+' {
+		_, _ = fr.ReadByte()
+	}
+
+	var val int64
+	digitsRead := 0
+
+	for {
+		b, err = fr.PeekByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return 0, err
+		}
+		if b < '0' || b > '9' {
+			break
+		}
+		_, _ = fr.ReadByte()
+		val = val*10 + int64(b-'0')
+		digitsRead++
+	}
+	if digitsRead == 0 {
+		return 0, errors.New("fastio: NextInt64: no digits found")
+	}
+	return sign * val, nil
+}
+
+func (fr *FastReader) NextUint64() (uint64, error) {
+	if err := fr.SkipSpaces(); err != nil {
+		return 0, err
+	}
+
+	b, err := fr.PeekByte()
+	if err != nil {
+		return 0, err
+	}
+
+	if b == '+' {
+		_, _ = fr.ReadByte()
+	}
+
+	var val uint64
+	digitsRead := 0
+
+	for {
+		b, err = fr.PeekByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return 0, err
+		}
+		if b < '0' || b > '9' {
+			break
+		}
+		_, _ = fr.ReadByte()
+		val = val*10 + uint64(b-'0')
+		digitsRead++
+	}
+	if digitsRead == 0 {
+		return 0, errors.New("fastio: NextUint64: no digits found")
+	}
+	return val, nil
+}
+
+func (fr *FastReader) NextFloat64() (float64, error) {
+	token, err := fr.NextWord()
+	if err != nil {
+		return 0, err
+	}
+	v, err := strconv.ParseFloat(token, 64)
+	if err != nil {
+		return 0, err
+	}
+	return v, nil
 }
 
 func (fr *FastReader) NextLine() (string, error) {
